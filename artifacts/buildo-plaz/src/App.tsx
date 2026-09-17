@@ -226,11 +226,19 @@ function Home() {
 }
 
 type DemoStage = 'capture' | 'processing' | 'review' | 'approved';
+type VoiceLanguage = 'en-IN' | 'te-IN' | 'hi-IN';
+
+const VOICE_LANGUAGES: Array<{ value: VoiceLanguage; label: string }> = [
+  { value: 'en-IN', label: 'English' },
+  { value: 'te-IN', label: 'తెలుగు · Telugu' },
+  { value: 'hi-IN', label: 'हिन्दी · Hindi' },
+];
 
 function Demo() {
   const [stage, setStage] = useState<DemoStage>('capture');
   const [update, setUpdate] = useState('');
   const [recording, setRecording] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>('en-IN');
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'unsupported' | 'denied' | 'error'>('idle');
   const [voiceMessage, setVoiceMessage] = useState('');
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -296,14 +304,15 @@ function Demo() {
     }
 
     const recognition = new Recognition();
-    recognition.lang = 'en-IN';
+    recognition.lang = voiceLanguage;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
     transcriptRef.current = '';
     setUpdate('');
     setVoiceState('listening');
-    setVoiceMessage('Listening now. Speak naturally, then press the microphone to stop.');
+    const selectedLanguage = VOICE_LANGUAGES.find((language) => language.value === voiceLanguage)?.label ?? 'English';
+    setVoiceMessage(`Listening in ${selectedLanguage}. Speak naturally, then press the microphone to stop.`);
 
     recognition.onstart = () => {
       setRecording(true);
@@ -371,7 +380,7 @@ function Demo() {
                 <>
                   <div className="panel-title"><strong>Supervisor voice update</strong><span>Input / field note</span></div>
                   <div className="record-box">
-                    <div className="record-label"><span><AudioLines size={13} /> &nbsp; Northline Civic Centre</span><span>Today / 07:42</span></div>
+                    <div className="record-label"><span><AudioLines size={13} /> &nbsp; Northline Civic Centre</span><label className="demo-language"><span>Voice language</span><select value={voiceLanguage} onChange={(event) => setVoiceLanguage(event.target.value as VoiceLanguage)} disabled={recording} data-testid="select-demo-voice-language">{VOICE_LANGUAGES.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}</select></label></div>
                     <textarea value={update} onChange={(event) => setUpdate(event.target.value)} placeholder="Tell us what changed on site..." aria-label="Voice update transcript" data-testid="input-voice-update" />
                     <div className="record-bottom"><span className="record-duration">{recording ? 'LISTENING...' : update ? 'WORDS CAPTURED' : 'READY TO SPEAK'}</span><button className={`mic-button ${recording ? 'recording' : ''}`} onClick={toggleRecording} aria-label={recording ? 'Stop listening' : 'Start microphone'} data-testid="button-record"><Mic size={20} /></button></div>
                   </div>
@@ -423,12 +432,14 @@ function ProcessingState() {
 
 function ReviewState({ transcript, onApprove, onReset }: { transcript: string; onApprove: () => void; onReset: () => void }) {
   const normalizedTranscript = transcript.toLowerCase();
+  const isIncomplete = /(?:\bincomplete\b|\bnot\s+(?:yet\s+)?completed?\b|\bnot\s+complete\b|\bunfinished\b|\bpending\b|\bnot\s+done\b|పూర్తి\s*కాలేదు|పూర్తికాలేదు|అసంపూర్తి|ముగియలేదు|अधूरा|अधूरी|पूरा\s+नहीं\s+हुआ|बाकी\s+है)/u.test(normalizedTranscript);
+  const isCompleted = !isIncomplete && /(?:\bcompleted?\b|\bfinished\b|\bdone\b|పూర్తయింది|పూర్తి\s+అయింది|పూర్తయ్యింది|ముగిసింది|पूरा\s+हुआ|पूरा\s+हो\s+गया|समाप्त|खत्म)/u.test(normalizedTranscript);
   const activity = normalizedTranscript.includes('wall')
     ? 'CON-118 / Core wall pour'
     : normalizedTranscript.includes('sleeve') || normalizedTranscript.includes('electrical')
       ? 'MEP-031 / Level 04 sleeves'
       : 'STR-042 / East stair landing pour';
-  const hasDelaySignal = /late|delay|behind|slip|problem|issue/.test(normalizedTranscript);
+  const hasDelaySignal = /(?:late|delay|behind|slip|problem|issue|ఆలస్యం|ఆలస్యంగా|జాప్యం|సమస్య|देरी|देर|विलंब|रुकावट)/u.test(normalizedTranscript);
   const location = normalizedTranscript.includes('east')
     ? 'east stair landing'
     : normalizedTranscript.includes('wall')
@@ -439,7 +450,7 @@ function ReviewState({ transcript, onApprove, onReset }: { transcript: string; o
     <div data-testid="status-review">
       <div className="panel-title"><strong>Review before it reaches the plan</strong><span>Human approval required</span></div>
       <div className="review-section"><h4>Clean transcription</h4><div className="transcript-card">{transcript}</div></div>
-      <div className="review-section"><h4>Engineering interpretation</h4><div className="tag-row"><span className="tag">{location}</span><span className="tag">{normalizedTranscript.includes('steel') ? 'steel placement' : 'site update'}</span><span className="tag">{normalizedTranscript.includes('complete') || normalizedTranscript.includes('finished') ? 'work complete' : 'work in progress'}</span><span className="tag">{hasDelaySignal ? 'schedule risk detected' : 'no delay signal'}</span></div></div>
+       <div className="review-section"><h4>Engineering interpretation</h4><div className="tag-row"><span className="tag">{location}</span><span className="tag">{normalizedTranscript.includes('steel') || /స్టీల్|ఇనుము|स्टील|सरिया/u.test(normalizedTranscript) ? 'steel placement' : 'site update'}</span><span className={`tag ${isIncomplete ? 'tag-warning' : ''}`}>{isIncomplete ? 'work incomplete' : isCompleted ? 'work complete' : 'work in progress'}</span><span className="tag">{hasDelaySignal || isIncomplete ? 'schedule risk detected' : 'no delay signal'}</span></div></div>
       <div className="review-section"><h4>Best schedule match</h4><div className="match-card"><div><strong>{activity}</strong><span>Matched from your transcript · Northline Civic Centre</span></div><div className="match-score"><b>{activity.startsWith('STR') ? '98.4%' : '86.7%'}</b>confidence</div></div></div>
       <div className="approve-row"><button className="edit-button" onClick={onReset} data-testid="button-edit-update">Edit update</button><button className="approve-button" onClick={onApprove} data-testid="button-approve"><Check size={15} /> Approve &amp; update plan</button></div>
     </div>

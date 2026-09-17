@@ -92,10 +92,16 @@ type SpeechRecognitionLike = {
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type VoiceLanguage = 'en-IN' | 'te-IN' | 'hi-IN';
 
 const STORAGE_KEY = 'buildo-plaz-projects-v2';
 const SAMPLE_UPDATE =
   'Today Block A footing excavation was completed. We used two excavators and 18 workers. Twelve tonnes of reinforcement steel arrived and the pump came two hours late.';
+const VOICE_LANGUAGES: Array<{ value: VoiceLanguage; label: string }> = [
+  { value: 'en-IN', label: 'English' },
+  { value: 'te-IN', label: 'తెలుగు · Telugu' },
+  { value: 'hi-IN', label: 'हिन्दी · Hindi' },
+];
 
 function getRecognition(): SpeechRecognitionConstructor | undefined {
   const browserWindow = window as Window & {
@@ -194,14 +200,19 @@ function loadProjects(): Project[] {
 
 function createRecord(text: string, supervisor: string): DailyRecord {
   const normalized = text.toLowerCase();
-  const isCompleted = /completed|complete|finished|done/.test(normalized);
-  const hasDelay = /late|delay|behind|slip|issue|problem/.test(normalized);
-  const hasSteel = /steel|rebar|reinforcement/.test(normalized);
-  const hasConcrete = /pcc|concrete|pour/.test(normalized);
-  const hasExcavation = /excavat|footing/.test(normalized);
+  const isIncomplete =
+    /(?:\bincomplete\b|\bnot\s+(?:yet\s+)?completed?\b|\bnot\s+complete\b|\bunfinished\b|\bpending\b|\bnot\s+done\b|\bstill\s+(?:in progress|working)\b|పూర్తి\s*కాలేదు|పూర్తికాలేదు|అసంపూర్తి|ఇంకా\s+పూర్తి\s+లేదు|ముగియలేదు|మిగిలి\s+ఉంది|अधूरा|अधूरी|पूरा\s+नहीं\s+हुआ|अभी\s+पूरा\s+नहीं|बाकी\s+है|रुका\s+हुआ)/u.test(normalized);
+  const isCompleted =
+    !isIncomplete &&
+    /(?:\bcompleted?\b|\bfinished\b|\bdone\b|పూర్తయింది|పూర్తి\s+అయింది|పూర్తయ్యింది|ముగిసింది|చేశాము|पूरा\s+हुआ|पूरा\s+हो\s+गया|समाप्त|खत्म)/u.test(normalized);
+  const hasDelay = /(?:\blate\b|\bdelay(?:ed)?\b|\bbehind\b|\bslip\b|\bissue\b|\bproblem\b|ఆలస్యం|ఆలస్యంగా|జాప్యం|ఆగింది|సమస్య|వెనుకబడింది|देरी|देर|विलंब|रुकावट|पीछे)/u.test(normalized);
+  const hasSteel = /(?:\bsteel\b|\brebar\b|\breinforcement\b|స్టీల్|ఇనుము|రీబార్|రీఇన్ఫోర్స్మెంట్|स्टील|सरिया|रीबार|लोहा)/u.test(normalized);
+  const hasConcrete = /(?:\bpcc\b|\bconcrete\b|\bpour\b|కాంక్రీట్|కాంక్రీటు|పిసిసి|कंक्रीट|पीसीसी)/u.test(normalized);
+  const hasExcavation = /(?:\bexcavat\w*\b|\bfooting\b|తవ్వకం|ఫుటింగ్|పునాది|खुदाई|फुटिंग|नींव)/u.test(normalized);
+  const hasBlockA = /(?:\bblock\s*a\b|బ్లాక్\s*ఏ|ब्लॉक\s*ए)/u.test(normalized);
   const quantityMatch = text.match(/\b\d+(?:\.\d+)?\s*(?:m3|m³|m2|m²|tonnes?|bags?|units?)\b/i);
-  const laborMatch = text.match(/\b\d+\s*(?:workers?|labou?rs?|people)\b/i);
-  const durationMatch = text.match(/\b\d+(?:\.\d+)?\s*(?:hours?|hrs?)\b/i);
+  const laborMatch = text.match(/(?:\b\d+\s*(?:workers?|labou?rs?|people)\b|\d+\s*(?:మంది|కార్మికులు|వర్కర్లు)|\d+\s*(?:मजदूर|कामगार|लोग))/iu);
+  const durationMatch = text.match(/(?:\b\d+(?:\.\d+)?\s*(?:hours?|hrs?)\b|\d+(?:\.\d+)?\s*(?:గంటలు|గం)|\d+(?:\.\d+)?\s*(?:घंटे|घंटों))/iu);
   const engineeringActivity = hasExcavation
     ? 'Block A footing excavation'
     : hasConcrete
@@ -216,11 +227,11 @@ function createRecord(text: string, supervisor: string): DailyRecord {
     supervisor,
     rawUpdate: text,
     engineeringActivity,
-    location: /block a/i.test(text) ? 'Block A / Footing F1' : 'Site area pending',
+    location: hasBlockA || hasExcavation ? 'Block A / Footing F1' : 'Site area pending',
     level: hasSteel || hasExcavation ? 'L5' : 'L6',
-    status: hasDelay ? 'At risk' : isCompleted ? 'Completed' : 'In progress',
+    status: hasDelay ? 'At risk' : isIncomplete ? 'Incomplete' : isCompleted ? 'Completed' : 'In progress',
     quantity: quantityMatch?.[0] ?? 'Not stated',
-    materialsReceived: /received|arrived|delivered/.test(normalized)
+    materialsReceived: /(?:\breceived\b|\barrived\b|\bdelivered\b|వచ్చింది|అందింది|డెలివరీ|తీసుకొచ్చారు|మిలా|प्राप्त|आ गया|डिलीवरी)/u.test(normalized)
       ? hasSteel
         ? 'Reinforcement steel received'
         : 'Material delivery received'
@@ -229,7 +240,7 @@ function createRecord(text: string, supervisor: string): DailyRecord {
     materialsRemaining: 'Confirm in next update',
     labor: laborMatch?.[0] ?? 'Not stated',
     duration: durationMatch?.[0] ?? 'Not stated',
-    delay: hasDelay ? 'Delay signal detected in update' : 'None reported',
+    delay: hasDelay ? 'Delay signal detected in update' : isIncomplete ? 'Work remains incomplete' : 'None reported',
   };
 }
 
@@ -447,6 +458,7 @@ function ProjectView({ project, onBack, onUpdate }: { project: Project; onBack: 
   const [tab, setTab] = useState<'records' | 'plan' | 'team'>('records');
   const [transcript, setTranscript] = useState('');
   const [supervisor, setSupervisor] = useState(project.members.find((member) => member.role === 'Supervisor')?.name ?? project.members[0]?.name ?? 'Supervisor');
+  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>('en-IN');
   const [recording, setRecording] = useState(false);
   const [voiceMessage, setVoiceMessage] = useState('');
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -473,13 +485,14 @@ function ProjectView({ project, onBack, onUpdate }: { project: Project; onBack: 
       return;
     }
     const recognition = new Recognition();
-    recognition.lang = 'en-IN';
+    recognition.lang = voiceLanguage;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
     transcriptRef.current = '';
     setTranscript('');
-    setVoiceMessage('Listening. Tell Buildo what happened on site today.');
+    const selectedLanguage = VOICE_LANGUAGES.find((language) => language.value === voiceLanguage)?.label ?? 'English';
+    setVoiceMessage(`Listening in ${selectedLanguage}. Tell Buildo what happened on site today.`);
     recognition.onstart = () => setRecording(true);
     recognition.onresult = (event) => {
       let interim = '';
@@ -535,6 +548,7 @@ function ProjectView({ project, onBack, onUpdate }: { project: Project; onBack: 
               <div className="workspace-card-heading"><span className="step-number">TODAY</span><div><strong>Supervisor field update</strong><span>Speak it once. Buildo keeps the record.</span></div></div>
               <div className="capture-controls">
                 <label className="form-field"><span>Submitted by</span><select value={supervisor} onChange={(event) => setSupervisor(event.target.value)}>{project.members.filter((member) => member.role === 'Supervisor' || member.role === 'Engineer').map((member) => <option key={member.id}>{member.name}</option>)}<option>New supervisor</option></select></label>
+                <label className="form-field capture-language"><span>Voice language</span><select value={voiceLanguage} onChange={(event) => setVoiceLanguage(event.target.value as VoiceLanguage)} disabled={recording} data-testid="select-voice-language">{VOICE_LANGUAGES.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}</select></label>
                 <button className={`workspace-mic ${recording ? 'recording' : ''}`} onClick={toggleRecording}><Mic size={18} /> {recording ? 'Stop listening' : 'Speak update'}</button>
               </div>
               <textarea className="workspace-transcript" value={transcript} onChange={(event) => setTranscript(event.target.value)} placeholder="Example: Today Block A footing excavation was completed. Twelve tonnes of steel arrived. We used 18 workers..." rows={5} data-testid="input-daily-update" />
