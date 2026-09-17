@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
   ArrowRight,
@@ -22,6 +22,42 @@ const queryClient = new QueryClient();
 
 const EXAMPLE_UPDATE =
   'We poured the east stair landing this morning. Steel is in and the crew is stripping forms after lunch. We are about half a day behind because the pump arrived late, but we can make it back on the next pour.';
+
+type SpeechResult = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+
+type SpeechResultEvent = {
+  resultIndex: number;
+  results: ArrayLike<SpeechResult>;
+};
+
+type SpeechErrorEvent = {
+  error?: string;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: ((event: SpeechErrorEvent) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | undefined {
+  const browserWindow = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
+}
 
 function Brand() {
   return (
@@ -193,21 +229,128 @@ function Demo() {
   const [stage, setStage] = useState<DemoStage>('capture');
   const [update, setUpdate] = useState('');
   const [recording, setRecording] = useState(false);
+  const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'unsupported' | 'denied' | 'error'>('idle');
+  const [voiceMessage, setVoiceMessage] = useState('');
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const transcriptRef = useRef('');
 
-  const useExample = () => setUpdate(EXAMPLE_UPDATE);
-  const reset = () => { setStage('capture'); setUpdate(''); setRecording(false); };
+  useEffect(() => () => {
+    recognitionRef.current?.stop();
+  }, []);
+
+  const useExample = () => {
+    recognitionRef.current?.stop();
+    transcriptRef.current = EXAMPLE_UPDATE;
+    setUpdate(EXAMPLE_UPDATE);
+    setRecording(false);
+    setVoiceState('idle');
+    setVoiceMessage('Example loaded. You can edit it or record your own update.');
+  };
+
+  const reset = () => {
+    recognitionRef.current?.stop();
+    setStage('capture');
+    setUpdate('');
+    setRecording(false);
+    setVoiceState('idle');
+    setVoiceMessage('');
+    transcriptRef.current = '';
+  };
+
   const startAnalysis = () => {
     if (!update.trim()) return;
+    recognitionRef.current?.stop();
     setStage('processing');
     window.setTimeout(() => setStage('review'), 1600);
   };
-  const toggleRecording = () => {
+
+  const toggleRecording = async () => {
     if (recording) {
       setRecording(false);
-      if (!update) setUpdate(EXAMPLE_UPDATE);
-    } else {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const Recognition = getSpeechRecognitionConstructor();
+    if (!Recognition) {
+      setVoiceState('unsupported');
+      setVoiceMessage('Live speech input is not supported in this browser. Try Chrome or Edge, or type the update below.');
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setVoiceState('unsupported');
+      setVoiceMessage('This browser cannot request microphone access. Try the latest Chrome or Edge over a secure connection.');
+      return;
+    }
+
+    try {
+      const microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
+      microphone.getTracks().forEach((track) => track.stop());
+    } catch {
+      setVoiceState('denied');
+      setVoiceMessage('Microphone access is blocked. Allow microphone access in your browser settings, then try again.');
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.lang = 'en-IN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognitionRef.current = recognition;
+    transcriptRef.current = '';
+    setUpdate('');
+    setVoiceState('listening');
+    setVoiceMessage('Listening now. Speak naturally, then press the microphone to stop.');
+
+    recognition.onstart = () => {
       setRecording(true);
-      window.setTimeout(() => { setRecording(false); setUpdate(EXAMPLE_UPDATE); }, 1300);
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const text = result[0]?.transcript ?? '';
+        if (result.isFinal) {
+          transcriptRef.current = `${transcriptRef.current} ${text}`.trim();
+        } else {
+          interimTranscript += text;
+        }
+      }
+
+      const combinedTranscript = `${transcriptRef.current} ${interimTranscript}`.trim();
+      if (combinedTranscript) {
+        setUpdate(combinedTranscript);
+        setVoiceMessage('Words captured. Keep speaking or press the microphone to finish.');
+      }
+    };
+
+    recognition.onerror = (event) => {
+      setRecording(false);
+      const permissionError = event.error === 'not-allowed' || event.error === 'service-not-allowed';
+      setVoiceState(permissionError ? 'denied' : 'error');
+      setVoiceMessage(
+        permissionError
+          ? 'Microphone access is blocked. Allow it in your browser settings, then try again.'
+          : 'The speech service stopped unexpectedly. Check your connection and try again.',
+      );
+    };
+
+    recognition.onend = () => {
+      setRecording(false);
+      if (transcriptRef.current.trim()) {
+        setVoiceState('idle');
+        setVoiceMessage('Voice update captured. Edit the transcript if needed, then interpret it.');
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      setRecording(false);
+      setVoiceState('error');
+      setVoiceMessage('The microphone could not start. Try again in a moment.');
     }
   };
 
@@ -218,7 +361,7 @@ function Demo() {
         <div className="max-width">
           <div className="demo-intro reveal">
             <div><div className="eyebrow">Interactive field signal / 01</div><h1>Give us the update.<br />We&apos;ll find the <em>work.</em></h1></div>
-            <p>This is a self-contained preview using a real project scenario. Start with the provided example or record your own version.</p>
+            <p>Speak naturally from the field. Your browser captures the words, then Buildo turns them into an engineering record you can review.</p>
           </div>
           <div className="demo-layout">
             <section className="demo-panel reveal delay-1">
@@ -228,14 +371,15 @@ function Demo() {
                   <div className="record-box">
                     <div className="record-label"><span><AudioLines size={13} /> &nbsp; Northline Civic Centre</span><span>Today / 07:42</span></div>
                     <textarea value={update} onChange={(event) => setUpdate(event.target.value)} placeholder="Tell us what changed on site..." aria-label="Voice update transcript" data-testid="input-voice-update" />
-                    <div className="record-bottom"><span className="record-duration">{recording ? 'LISTENING...' : update ? 'EXAMPLE LOADED' : 'READY TO RECORD'}</span><button className={`mic-button ${recording ? 'recording' : ''}`} onClick={toggleRecording} aria-label={recording ? 'Stop recording' : 'Record voice update'} data-testid="button-record"><Mic size={20} /></button></div>
+                    <div className="record-bottom"><span className="record-duration">{recording ? 'LISTENING...' : update ? 'WORDS CAPTURED' : 'READY TO SPEAK'}</span><button className={`mic-button ${recording ? 'recording' : ''}`} onClick={toggleRecording} aria-label={recording ? 'Stop listening' : 'Start microphone'} data-testid="button-record"><Mic size={20} /></button></div>
                   </div>
+                  {voiceMessage && <div className={`voice-feedback ${voiceState}`} role="status"><span className="voice-feedback-dot" />{voiceMessage}</div>}
                   <div className="demo-options"><button className="sample-button" onClick={useExample} data-testid="button-use-example">Use the provided example</button><button className="analyze-button" onClick={startAnalysis} disabled={!update.trim()} data-testid="button-analyze">Interpret update <ArrowRight size={14} /></button></div>
-                  <div className="demo-footnote"><ShieldCheck size={14} /> Demo data stays in this browser session.</div>
+                  <div className="demo-footnote"><ShieldCheck size={14} /> Your transcript stays in this browser session until you submit it.</div>
                 </>
               )}
               {stage === 'processing' && <ProcessingState />}
-              {stage === 'review' && <ReviewState onApprove={() => setStage('approved')} onReset={reset} />}
+              {stage === 'review' && <ReviewState transcript={update} onApprove={() => setStage('approved')} onReset={reset} />}
               {stage === 'approved' && <ApprovedState onReset={reset} />}
             </section>
             <aside>
@@ -275,13 +419,26 @@ function ProcessingState() {
   );
 }
 
-function ReviewState({ onApprove, onReset }: { onApprove: () => void; onReset: () => void }) {
+function ReviewState({ transcript, onApprove, onReset }: { transcript: string; onApprove: () => void; onReset: () => void }) {
+  const normalizedTranscript = transcript.toLowerCase();
+  const activity = normalizedTranscript.includes('wall')
+    ? 'CON-118 / Core wall pour'
+    : normalizedTranscript.includes('sleeve') || normalizedTranscript.includes('electrical')
+      ? 'MEP-031 / Level 04 sleeves'
+      : 'STR-042 / East stair landing pour';
+  const hasDelaySignal = /late|delay|behind|slip|problem|issue/.test(normalizedTranscript);
+  const location = normalizedTranscript.includes('east')
+    ? 'east stair landing'
+    : normalizedTranscript.includes('wall')
+      ? 'core wall'
+      : 'field activity';
+
   return (
     <div data-testid="status-review">
       <div className="panel-title"><strong>Review before it reaches the plan</strong><span>Human approval required</span></div>
-      <div className="review-section"><h4>Clean transcription</h4><div className="transcript-card">The east stair landing was poured this morning. Steel is in and the crew is stripping forms after lunch. The pump arrived late, putting the work about half a day behind, but the next pour can recover the time.</div></div>
-      <div className="review-section"><h4>Engineering interpretation</h4><div className="tag-row"><span className="tag">east stair landing</span><span className="tag">concrete pour</span><span className="tag">steel complete</span><span className="tag">0.5 day delay</span></div></div>
-      <div className="review-section"><h4>Best schedule match</h4><div className="match-card"><div><strong>STR-042 / East stair landing pour</strong><span>Level 5 · Structural concrete · Northline Civic Centre</span></div><div className="match-score"><b>98.4%</b>confidence</div></div></div>
+      <div className="review-section"><h4>Clean transcription</h4><div className="transcript-card">{transcript}</div></div>
+      <div className="review-section"><h4>Engineering interpretation</h4><div className="tag-row"><span className="tag">{location}</span><span className="tag">{normalizedTranscript.includes('steel') ? 'steel placement' : 'site update'}</span><span className="tag">{normalizedTranscript.includes('complete') || normalizedTranscript.includes('finished') ? 'work complete' : 'work in progress'}</span><span className="tag">{hasDelaySignal ? 'schedule risk detected' : 'no delay signal'}</span></div></div>
+      <div className="review-section"><h4>Best schedule match</h4><div className="match-card"><div><strong>{activity}</strong><span>Matched from your transcript · Northline Civic Centre</span></div><div className="match-score"><b>{activity.startsWith('STR') ? '98.4%' : '86.7%'}</b>confidence</div></div></div>
       <div className="approve-row"><button className="edit-button" onClick={onReset} data-testid="button-edit-update">Edit update</button><button className="approve-button" onClick={onApprove} data-testid="button-approve"><Check size={15} /> Approve &amp; update plan</button></div>
     </div>
   );

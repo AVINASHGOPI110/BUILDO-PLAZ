@@ -228,6 +228,12 @@ button { font: inherit; }
 .mic-button { width:48px; height:48px; border-radius:50%; border:0; cursor:pointer; background:var(--coral); color:var(--paper); display:grid; place-items:center; transition:transform .2s ease; }
 .mic-button:hover { transform:scale(1.06); }
 .mic-button.recording { animation: micPulse 1s ease-in-out infinite alternate; }
+.voice-feedback { display:flex; gap:9px; align-items:flex-start; margin-top:13px; color:#6b776d; font:10px/1.5 var(--app-font-mono); }
+.voice-feedback-dot { flex:0 0 7px; width:7px; height:7px; border-radius:50%; background:#9da99b; margin-top:4px; }
+.voice-feedback.listening { color:var(--ink); }
+.voice-feedback.listening .voice-feedback-dot { background:var(--coral); box-shadow:0 0 0 4px rgba(236,111,87,.14); animation: micPulse 1s ease-in-out infinite alternate; }
+.voice-feedback.denied, .voice-feedback.error, .voice-feedback.unsupported { color:#a24f42; }
+.voice-feedback.denied .voice-feedback-dot, .voice-feedback.error .voice-feedback-dot, .voice-feedback.unsupported .voice-feedback-dot { background:var(--coral); }
 .demo-options { display:flex; justify-content:space-between; align-items:center; margin-top:18px; gap:15px; }
 .sample-button { border:0; padding:0; background:transparent; cursor:pointer; color:#69776c; font:11px var(--app-font-mono); text-decoration:underline; text-underline-offset:3px; }
 .analyze-button { background:var(--coral); color:var(--paper); border:0; cursor:pointer; padding:12px 16px; font-size:12px; font-weight:600; border-radius:3px; display:flex; align-items:center; gap:9px; }
