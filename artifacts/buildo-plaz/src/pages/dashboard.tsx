@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link } from 'wouter';
 import {
   ArrowLeft,
@@ -236,7 +236,7 @@ function createRecord(text: string, supervisor: string): DailyRecord {
 function makeProject(input: Omit<Project, 'id' | 'activities' | 'dailyRecords'>): Project {
   return {
     ...input,
-    id: `project-${Date.now()}`,
+    id: `project-${Date.now()}-${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 18)}`,
     activities: seedActivities(input.name),
     dailyRecords: [],
   };
@@ -370,9 +370,23 @@ function NewProject({ onCancel, onCreate }: { onCancel: () => void; onCreate: (p
   const [memberForm, setMemberForm] = useState({ name: '', email: '', role: 'Supervisor', area: '' });
 
   const addMember = () => {
-    if (!memberForm.name.trim()) return;
-    setMembers((current) => [...current, { ...memberForm, id: `member-${Date.now()}` }]);
+    const name = memberForm.name.trim();
+    if (!name) return;
+    setMembers((current) => [...current, {
+      name,
+      email: memberForm.email.trim(),
+      role: memberForm.role,
+      area: memberForm.area.trim(),
+      id: `member-${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 14)}`,
+    }]);
     setMemberForm({ name: '', email: '', role: 'Supervisor', area: '' });
+  };
+
+  const handleMemberKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addMember();
+    }
   };
 
   const submit = (event: FormEvent) => {
@@ -411,14 +425,15 @@ function NewProject({ onCancel, onCreate }: { onCancel: () => void; onCreate: (p
         <section className="workspace-form-card">
           <div className="workspace-card-heading"><span className="step-number">02</span><div><strong>Add project members</strong><span>Who keeps the work moving?</span></div></div>
           <div className="member-form">
-            <input value={memberForm.name} onChange={(event) => setMemberForm({ ...memberForm, name: event.target.value })} placeholder="Name" aria-label="Member name" />
-            <input value={memberForm.email} onChange={(event) => setMemberForm({ ...memberForm, email: event.target.value })} placeholder="Email" aria-label="Member email" />
+            <input value={memberForm.name} onChange={(event) => setMemberForm({ ...memberForm, name: event.target.value })} onKeyDown={handleMemberKeyDown} placeholder="Name" aria-label="Member name" />
+            <input value={memberForm.email} onChange={(event) => setMemberForm({ ...memberForm, email: event.target.value })} onKeyDown={handleMemberKeyDown} placeholder="Email" aria-label="Member email" />
             <select value={memberForm.role} onChange={(event) => setMemberForm({ ...memberForm, role: event.target.value })} aria-label="Member role"><option>Supervisor</option><option>Engineer</option><option>Project Manager</option><option>Chief Engineer</option><option>Contractor</option></select>
-            <input value={memberForm.area} onChange={(event) => setMemberForm({ ...memberForm, area: event.target.value })} placeholder="Assigned area" aria-label="Assigned area" />
-            <button type="button" className="icon-add" onClick={addMember} aria-label="Add member"><Plus size={17} /></button>
+            <input value={memberForm.area} onChange={(event) => setMemberForm({ ...memberForm, area: event.target.value })} onKeyDown={handleMemberKeyDown} placeholder="Assigned area" aria-label="Assigned area" />
+            <button type="button" className="icon-add" onClick={addMember} aria-label="Add member" data-testid="button-add-member"><Plus size={16} /><span>Add member</span></button>
           </div>
           <div className="member-list">
             {members.length === 0 && <div className="empty-members"><Users size={18} /><span>Add supervisors, engineers, and the project manager.</span></div>}
+            {members.length > 0 && <div className="member-count">{members.length} {members.length === 1 ? 'person' : 'people'} added · add as many as this project needs</div>}
             {members.map((member) => <div className="member-row" key={member.id}><span className="member-avatar">{member.name.slice(0, 2).toUpperCase()}</span><div><strong>{member.name}</strong><small>{member.role} · {member.area || 'Area pending'}</small></div><button type="button" onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))} aria-label={`Remove ${member.name}`}><X size={14} /></button></div>)}
           </div>
           <div className="workspace-form-actions"><button type="button" className="workspace-secondary" onClick={onCancel}>Cancel</button><button type="submit" className="workspace-primary" data-testid="button-create-project"><Save size={15} /> Create project</button></div>
@@ -543,14 +558,24 @@ function ProjectView({ project, onBack, onUpdate }: { project: Project; onBack: 
 }
 
 function PlanView({ activities }: { activities: Activity[] }) {
+  const levelLegend = [
+    { level: 'L1', label: 'Project' },
+    { level: 'L2', label: 'Phase' },
+    { level: 'L3', label: 'Area' },
+    { level: 'L4', label: 'Work package' },
+    { level: 'L5', label: 'Activity' },
+    { level: 'L6', label: 'Execution task' },
+  ];
+
   return (
     <section className="plan-section">
-      <div className="plan-intro"><div><div className="section-label">Schedule hierarchy / L1 to L6</div><h2>See the whole plan.<br /><span>Watch the execution levels.</span></h2></div><p>L1–L4 give the project its structure. L5 and L6 are the detailed work that supervisors report every day, so they are highlighted here.</p></div>
+      <div className="plan-intro"><div><div className="section-label">Schedule hierarchy / L1 to L6</div><h2>See the whole plan.<br /><span>Watch every level move.</span></h2></div><p>Buildo records the full chain from project to execution task. Dark levels set the structure; red levels show the work fronts that drive daily progress.</p></div>
+      <div className="level-legend" aria-label="Schedule level legend">{levelLegend.map((item) => <div className={`level-legend-item legend-${item.level.toLowerCase()}`} key={item.level}><strong>{item.level}</strong><span>{item.label}</span></div>)}</div>
       <div className="hierarchy-card">
         <div className="hierarchy-head"><span>Code</span><span>Activity</span><span>Discipline</span><span>Status</span><span>Progress</span></div>
-        {activities.map((activity) => <div className={`hierarchy-row level-${activity.level} ${activity.level >= 5 ? 'execution-level' : ''}`} key={activity.id}><span className="hierarchy-code">{activity.code}</span><div><strong>{activity.name}</strong><small>Parent: {activity.parent}</small></div><span>{activity.discipline}</span><span className={`record-status ${activity.status.toLowerCase().replace(' ', '-')}`}>{activity.status}</span><div className="hierarchy-progress"><i style={{ width: `${activity.progress}%` }} /><small>{activity.progress}%</small></div></div>)}
+        {activities.map((activity) => <div className={`hierarchy-row level-${activity.level}`} key={activity.id}><span className="hierarchy-code">{activity.code}</span><div><strong>{activity.name}</strong><small>Parent: {activity.parent}</small></div><span>{activity.discipline}</span><span className={`record-status ${activity.status.toLowerCase().replace(' ', '-')}`}>{activity.status}</span><div className="hierarchy-progress"><i style={{ width: `${activity.progress}%` }} /><small>{activity.progress}%</small></div></div>)}
       </div>
-      <div className="execution-note"><Layers3 size={18} /><div><strong>L5 and L6 are the execution signal.</strong><span>Every daily voice update attaches to the detailed activities here, so the engineer sees exactly what moved without visiting every work front.</span></div></div>
+      <div className="execution-note"><Layers3 size={18} /><div><strong>Every level is part of the record.</strong><span>Daily voice updates attach to the detailed L5 and L6 activities, while the full L1–L6 chain keeps every signal in its project context.</span></div></div>
     </section>
   );
 }

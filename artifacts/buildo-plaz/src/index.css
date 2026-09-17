@@ -406,8 +406,11 @@ button { font: inherit; }
 .form-field input:focus, .form-field select:focus, .form-field textarea:focus, .member-form input:focus, .member-form select:focus { border-color:var(--coral); box-shadow:0 0 0 3px rgba(225,108,77,.12); }
 .form-field-wide { grid-column:1/-1; }
 .member-form { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-.member-form .icon-add { grid-column:1/-1; width:100%; height:37px; border:1px dashed #aebaae; background:transparent; color:var(--ink); cursor:pointer; display:grid; place-items:center; }
+.member-form .icon-add { grid-column:1/-1; width:100%; min-height:39px; border:1px solid var(--ink); border-radius:3px; background:var(--ink); color:var(--lime); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; font:10px var(--app-font-mono); letter-spacing:.08em; text-transform:uppercase; transition:background .2s ease, color .2s ease, transform .2s ease; }
+.member-form .icon-add:hover { background:var(--coral); border-color:var(--coral); color:var(--paper); transform:translateY(-1px); }
+.member-form .icon-add:focus-visible { outline:3px solid rgba(225,108,77,.25); outline-offset:2px; }
 .member-list { display:grid; gap:8px; min-height:175px; align-content:start; margin-top:19px; }
+.member-count { padding:0 0 4px; color:#778379; font:9px var(--app-font-mono); letter-spacing:.06em; text-transform:uppercase; }
 .empty-members { min-height:140px; display:grid; place-items:center; align-content:center; gap:8px; color:#89958b; font:10px var(--app-font-mono); text-align:center; }
 .member-row { display:flex; gap:10px; align-items:center; border-bottom:1px solid #d6ddd1; padding:8px 0; }
 .member-avatar { display:grid; place-items:center; flex:0 0 31px; width:31px; height:31px; border-radius:50%; background:var(--ink); color:var(--lime); font:10px var(--app-font-mono); }
@@ -453,8 +456,10 @@ button { font: inherit; }
 .daily-table td strong, .daily-table td small { display:block; }
 .daily-table td small { margin-top:4px; color:#78857b; white-space:normal; max-width:170px; font:9px/1.4 var(--app-font-mono); }
 .daily-table tbody tr:hover { background:#edf1e7; }
-.level-badge { display:inline-flex; padding:4px 6px; background:#d7f169; color:var(--ink); font:9px var(--app-font-mono); }
-.level-badge.l6 { background:#f1c4b6; }
+.level-badge { display:inline-flex; padding:4px 6px; color:var(--paper); font:9px var(--app-font-mono); }
+.level-badge.l1, .level-badge.l2, .level-badge.l3, .level-badge.l4 { background:var(--ink); }
+.level-badge.l5 { background:#cf5b43; }
+.level-badge.l6 { background:#942f2b; }
 .record-status { display:inline-flex; padding:4px 7px; background:#d8e2d3; color:#52665a; font:9px var(--app-font-mono); white-space:nowrap; }
 .record-status.completed { background:#d7f169; color:var(--ink); }
 .record-status.at-risk { background:#f1c4b6; color:#703a2d; }
@@ -466,6 +471,12 @@ button { font: inherit; }
 .plan-intro h2 { margin:10px 0 0; font-size:34px; line-height:.96; letter-spacing:-.07em; }
 .plan-intro h2 span { color:var(--coral); }
 .plan-intro p { max-width:360px; margin:0; color:#6e7b71; font-size:12px; line-height:1.5; }
+.level-legend { display:grid; grid-template-columns:repeat(6, 1fr); gap:7px; margin:0 0 18px; }
+.level-legend-item { display:flex; align-items:center; gap:9px; min-height:48px; padding:9px 10px; color:var(--paper); }
+.level-legend-item strong { font:11px var(--app-font-mono); }
+.level-legend-item span { color:#c8d0c7; font:9px var(--app-font-mono); line-height:1.25; text-transform:uppercase; }
+.legend-l1 { background:#142720; }.legend-l2 { background:#1a3029; }.legend-l3 { background:#203a31; }.legend-l4 { background:#29443a; }
+.legend-l5 { background:#cf5b43; }.legend-l6 { background:#942f2b; }
 .hierarchy-head, .hierarchy-row { display:grid; grid-template-columns:65px 2fr 1fr 1fr 1fr; gap:15px; align-items:center; padding:15px 18px; }
 .hierarchy-head { color:#778379; background:#e1e7dc; font:9px var(--app-font-mono); text-transform:uppercase; letter-spacing:.08em; }
 .hierarchy-row { border-top:1px solid #d6ddd1; font-size:11px; }
@@ -476,8 +487,19 @@ button { font: inherit; }
 .hierarchy-row.level-4 { padding-left:66px; }
 .hierarchy-row.level-5 { padding-left:82px; }
 .hierarchy-row.level-6 { padding-left:98px; }
-.hierarchy-row.execution-level { background:#eef6d4; box-shadow:inset 4px 0 0 var(--lime); }
-.hierarchy-row.execution-level .hierarchy-code { color:var(--coral); font-weight:700; }
+.hierarchy-row.level-1 { background:#142720; }
+.hierarchy-row.level-2 { background:#1a3029; }
+.hierarchy-row.level-3 { background:#203a31; }
+.hierarchy-row.level-4 { background:#29443a; }
+.hierarchy-row.level-5 { background:#cf5b43; }
+.hierarchy-row.level-6 { background:#942f2b; }
+.hierarchy-row.level-1, .hierarchy-row.level-2, .hierarchy-row.level-3, .hierarchy-row.level-4, .hierarchy-row.level-5, .hierarchy-row.level-6 { color:var(--paper); border-color:rgba(255,255,255,.12); }
+.hierarchy-row.level-1 small, .hierarchy-row.level-2 small, .hierarchy-row.level-3 small, .hierarchy-row.level-4 small, .hierarchy-row.level-5 small, .hierarchy-row.level-6 small { color:#c8d0c7; }
+.hierarchy-row.level-1 .hierarchy-code, .hierarchy-row.level-2 .hierarchy-code, .hierarchy-row.level-3 .hierarchy-code, .hierarchy-row.level-4 .hierarchy-code { color:var(--lime); font-weight:700; }
+.hierarchy-row.level-5 .hierarchy-code, .hierarchy-row.level-6 .hierarchy-code { color:var(--paper); font-weight:700; }
+.hierarchy-row.level-1 .hierarchy-progress, .hierarchy-row.level-2 .hierarchy-progress, .hierarchy-row.level-3 .hierarchy-progress, .hierarchy-row.level-4 .hierarchy-progress, .hierarchy-row.level-5 .hierarchy-progress, .hierarchy-row.level-6 .hierarchy-progress { background:rgba(255,255,255,.22); }
+.hierarchy-row.level-1 .hierarchy-progress i, .hierarchy-row.level-2 .hierarchy-progress i, .hierarchy-row.level-3 .hierarchy-progress i, .hierarchy-row.level-4 .hierarchy-progress i, .hierarchy-row.level-5 .hierarchy-progress i, .hierarchy-row.level-6 .hierarchy-progress i { background:var(--lime); }
+.hierarchy-row.level-1 .hierarchy-progress small, .hierarchy-row.level-2 .hierarchy-progress small, .hierarchy-row.level-3 .hierarchy-progress small, .hierarchy-row.level-4 .hierarchy-progress small, .hierarchy-row.level-5 .hierarchy-progress small, .hierarchy-row.level-6 .hierarchy-progress small { color:var(--paper); }
 .hierarchy-code { font:11px var(--app-font-mono); }
 .hierarchy-progress { display:flex; align-items:center; gap:8px; min-width:100px; height:5px; background:#d6ddd1; }
 .hierarchy-progress i { background:var(--ink); }
