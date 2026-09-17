@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Buildo Plaz"
+description = "A public product website and interactive demo for Buildo Plaz, an AI-powered construction execution intelligence platform that turns supervisor site updates into verified engineering progress."
+version = "1.0.0"
+id = "artifacts/buildo-plaz"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21303
+
+[services.development]
+run = "pnpm --filter @workspace/buildo-plaz run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/buildo-plaz", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/buildo-plaz/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21303"
+BASE_PATH = "/"
