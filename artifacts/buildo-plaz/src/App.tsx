@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Dashboard } from '@/pages/dashboard';
 
 const queryClient = new QueryClient();
 
@@ -78,9 +79,10 @@ function SiteNav({ dark = false }: { dark?: boolean }) {
           <Link href="/#how-it-works" data-testid="link-how-it-works">How it works</Link>
           <Link href="/intelligence" data-testid="link-intelligence">Progress intelligence</Link>
           <Link href="/#field-notes" data-testid="link-field-notes">Field notes</Link>
+          <Link href="/dashboard" data-testid="link-dashboard">Workspace</Link>
         </nav>
         <div className="hero-actions">
-          <Link href="/demo" className="nav-demo" data-testid="link-start-demo">Enter the demo <ArrowUpRight size={14} /></Link>
+          <Link href="/dashboard" className="nav-demo" data-testid="link-start-demo">Open workspace <ArrowUpRight size={14} /></Link>
           <button className="mobile-menu" aria-label="Open menu" data-testid="button-mobile-menu" onClick={() => setLocation('/demo')}><Menu size={22} /></button>
         </div>
       </div>
@@ -506,7 +508,7 @@ function NotFound() {
 }
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/demo" component={Demo} /><Route path="/intelligence" component={Intelligence} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/demo" component={Demo} /><Route path="/intelligence" component={Intelligence} /><Route path="/dashboard" component={Dashboard} /><Route component={NotFound} /></Switch>;
 }
 
 export default function App() {
